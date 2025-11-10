@@ -27,8 +27,9 @@ public class ShopTypeController {
 
     @GetMapping("list")
     public Result queryTypeList() {
-        List<ShopType> typeList = typeService
-                .query().orderByAsc("sort").list();
-        return Result.ok(typeList);
+        //这是直接从mysql查询
+//        List<ShopType> typeList = typeService
+//                .query().orderByAsc("sort").list();
+        return typeService.queryTypeList();
     }
 }
