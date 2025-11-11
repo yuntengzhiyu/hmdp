@@ -9,6 +9,7 @@ import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RedisData;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
+import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
 
 /**
  * <p>
@@ -40,6 +42,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     //定义一个线程池
     private static final ExecutorService excutorService = Executors.newFixedThreadPool(10);
+    @Autowired
+    private CacheClient cacheClient;
 
 
     //使用逻辑过期解决缓存击穿问题
@@ -104,7 +108,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 //            return result;
 //        }
 //
-//        //使用互斥锁解决缓存穿透问题
+//        //使用互斥锁解决缓存击穿问题
 //        //缓存不存在， 到mysql中查找
 //        Shop shop = null;
 //        try {
@@ -186,5 +190,51 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
 
+
+    //引入CacheClient后，下面的代码更方便
+//    @Override
+//    public Result queryById(Long id) {
+//        // 调用解决缓存穿透的方法
+////        Shop shop = cacheClient.handleCachePenetration(CACHE_SHOP_KEY, id, Shop.class,
+////                this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
+////        if (Objects.isNull(shop)){
+////            return Result.fail("店铺不存在");
+////        }
+//
+//        // 调用解决缓存击穿的方法
+//        Shop shop = cacheClient.handleCacheBreakdown(CACHE_SHOP_KEY, id, Shop.class,
+//                this::getById, CACHE_SHOP_TTL, TimeUnit.SECONDS);
+//        if (Objects.isNull(shop)) {
+//            return Result.fail("店铺不存在");
+//        }
+//
+//        return Result.ok(shop);
+//    }
+//
+//    /**
+//     * 更新商铺数据（采用删除缓存模式，并且采用先操作数据库，后操作缓存）
+//     *
+//     * @param shop
+//     * @return
+//     */
+//    @Transactional
+//    @Override
+//    public Result updateShop(Shop shop) {
+//        // 参数校验, 略
+//
+//        // 1、更新数据库中的店铺数据
+//        boolean f = this.updateById(shop);
+//        if (!f) {
+//            // 缓存更新失败，抛出异常，事务回滚
+//            throw new RuntimeException("数据库更新失败");
+//        }
+//        // 2、删除缓存
+//        f = stringRedisTemplate.delete(CACHE_SHOP_KEY + shop.getId());
+//        if (!f) {
+//            // 缓存删除失败，抛出异常，事务回滚
+//            throw new RuntimeException("缓存删除失败");
+//        }
+//        return Result.ok();
+//    }
 
 }
