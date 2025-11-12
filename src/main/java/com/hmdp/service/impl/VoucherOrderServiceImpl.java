@@ -11,9 +11,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IVoucherService;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
+import com.hmdp.utils.lock.impl.SimpleRedisLock;
 import lombok.Synchronized;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +38,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Autowired
     private RedisIdWorker redisIdWorker;
 
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -57,11 +61,30 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足！");
         }
 
-        Long userID = UserHolder.getUser().getId();
-        synchronized (userID.toString().intern()) {
-            IVoucherOrderService o = (IVoucherOrderService) AopContext.currentProxy();
-            return o.createVoucherOrder(voucherId);
+        // 创建订单（使用分布式锁）
+        Long userId = UserHolder.getUser().getId();
+        SimpleRedisLock lock = new SimpleRedisLock(stringRedisTemplate, "order:" + userId);
+        boolean isLock = lock.tryLock(1200);
+        if (!isLock) {
+            // 索取锁失败，重试或者直接抛异常（这个业务是一人一单，所以直接返回失败信息）
+            return Result.fail("一人只能下一单");
         }
+        try {
+            // 索取锁成功，创建代理对象，使用代理对象调用第三方事务方法， 防止事务失效
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+        } finally {
+            lock.unlock();
+        }
+
+
+
+//        //只能解决单体一人一单问题
+//        Long userID = UserHolder.getUser().getId();
+//        synchronized (userID.toString().intern()) {
+//            IVoucherOrderService o = (IVoucherOrderService) AopContext.currentProxy();
+//            return o.createVoucherOrder(voucherId);
+//        }
 
 
     }
