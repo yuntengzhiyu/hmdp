@@ -19,4 +19,6 @@ public interface IShopService extends IService<Shop> {
     Result update(Shop shop);
 
     void saveShopToRedis(Long id, Long expireSeconds) throws InterruptedException;
+
+    Result queryShopByType(Integer typeId, Integer current, Double x, Double y);
 }
