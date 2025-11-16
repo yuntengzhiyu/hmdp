@@ -13,12 +13,16 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
-
+import static com.hmdp.utils.RedisConstants.USER_SIGN_KEY;
 
 
 /**
@@ -39,6 +43,9 @@ public class UserController {
 
     @Resource
     private IUserInfoService userInfoService;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 发送手机验证码
@@ -102,5 +109,24 @@ public class UserController {
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         // 返回
         return Result.ok(userDTO);
+    }
+
+
+    //sign
+    @GetMapping("/sign")
+    public Result sign() {
+        Long userId = UserHolder.getUser().getId();
+        LocalDateTime now = LocalDateTime.now();
+        String keyfix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        String key = USER_SIGN_KEY + userId + keyfix;
+        stringRedisTemplate.opsForValue().setBit(key, now.getDayOfMonth() - 1, true);
+        return Result.ok();
+    }
+
+
+    @GetMapping("/sign/count")
+    public Result signCount() {
+        return userService.signCount();
+
     }
 }

@@ -13,18 +13,24 @@ import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpSession;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
+import static com.hmdp.utils.RedisConstants.USER_SIGN_KEY;
 import static com.hmdp.utils.SystemConstants.USER_NICK_NAME_PREFIX;
 
 /**
@@ -118,5 +124,38 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     @Override
     public Result logout() {
         return null;
+    }
+
+    @Override
+    public Result signCount() {
+        Long UserId = UserHolder.getUser().getId();
+        LocalDateTime now = LocalDateTime.now();
+        String keyfix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        String key = USER_SIGN_KEY + UserId + keyfix;
+        int dayOfMonth = now.getDayOfMonth();
+
+        List<Long> list = stringRedisTemplate.opsForValue().bitField(key,
+                BitFieldSubCommands.create().get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0));
+        if(list == null || list.isEmpty()) {
+            return Result.ok(0);
+        }
+        Long num = list.get(0);
+        if(num == null || num == 0) {
+            return Result.ok(0);
+        }
+        int count = 0;
+        while (true) {
+            // 判断最后一位是否为0
+            if ((num & 1) == 0) {
+                break;
+            } else {
+                count++;
+            }
+            // 把数字右移一位
+            num >>= 1;
+        }
+        return Result.ok(count);
+
+
     }
 }
